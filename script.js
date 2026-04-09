@@ -123,7 +123,101 @@ document.addEventListener('DOMContentLoaded', () => {
     showSection('home');
     renderRestaurants();
     setupEventListeners();
+    setupSmoothScrolling();
+    setupIntersectionObserver();
 });
+
+// Setup smooth scrolling for navigation links
+function setupSmoothScrolling() {
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            showSection(targetId);
+        });
+    });
+}
+
+// Setup intersection observer for section animations
+function setupIntersectionObserver() {
+    const sections = document.querySelectorAll('section');
+    
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '-50px 0px -50px 0px'
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('fade-in');
+                // Update active navigation link when section comes into view
+                const sectionId = entry.target.id;
+                updateActiveNavLink(sectionId);
+            }
+        });
+    }, observerOptions);
+    
+    sections.forEach(section => {
+        observer.observe(section);
+    });
+    
+    // Setup scroll progress indicator
+    setupScrollProgress();
+}
+
+// Setup scroll progress indicator
+function setupScrollProgress() {
+    const progressBar = document.querySelector('.scroll-progress-bar');
+    
+    function updateScrollProgress() {
+        const scrollTop = window.pageYOffset;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercent = (scrollTop / docHeight) * 100;
+        
+        progressBar.style.width = scrollPercent + '%';
+    }
+    
+    // Update on scroll with throttling for performance
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            requestAnimationFrame(() => {
+                updateScrollProgress();
+                ticking = false;
+            });
+            ticking = true;
+        }
+    });
+    
+    // Initial update
+    updateScrollProgress();
+    
+    // Setup scroll to top button
+    setupScrollToTop();
+}
+
+// Setup scroll to top button
+function setupScrollToTop() {
+    const scrollToTopBtn = document.getElementById('scroll-to-top');
+    
+    // Show/hide button based on scroll position
+    window.addEventListener('scroll', () => {
+        if (window.pageYOffset > 300) {
+            scrollToTopBtn.classList.add('visible');
+        } else {
+            scrollToTopBtn.classList.remove('visible');
+        }
+    });
+    
+    // Scroll to top when clicked
+    scrollToTopBtn.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
+}
 
 // Load data from localStorage
 function loadData() {
@@ -161,11 +255,45 @@ function updateUI() {
     }
 }
 
-// Show section by scrolling to it
+// Show section with enhanced smooth scrolling
 function showSection(sectionId) {
     const section = document.getElementById(sectionId);
     if (section) {
-        section.scrollIntoView({ behavior: 'smooth' });
+        // Calculate offset for better positioning (accounting for fixed header)
+        const headerHeight = 70;
+        const sectionTop = section.offsetTop - headerHeight - 20; // 20px extra padding
+
+        // Smooth scroll with custom easing
+        window.scrollTo({
+            top: sectionTop,
+            behavior: 'smooth'
+        });
+
+        // Update active navigation link with slight delay for better UX
+        setTimeout(() => {
+            updateActiveNavLink(sectionId);
+        }, 300);
+
+        // Add visual feedback - highlight section briefly
+        section.style.transition = 'all 0.3s ease';
+        section.style.transform = 'scale(1.01)';
+        setTimeout(() => {
+            section.style.transform = 'scale(1)';
+        }, 600);
+    }
+}
+
+// Update active navigation link
+function updateActiveNavLink(sectionId) {
+    // Remove active class from all nav links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Add active class to current section link
+    const activeLink = document.querySelector(`a[href="#${sectionId}"]`);
+    if (activeLink) {
+        activeLink.classList.add('active');
     }
 }
 
@@ -204,7 +332,41 @@ function setupEventListeners() {
     // Search and filter
     document.getElementById('search-input').addEventListener('input', filterRestaurants);
     document.getElementById('filter-rating').addEventListener('change', filterRestaurants);
+
+    // Mobile navigation toggle
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+    
+    navToggle.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+        navToggle.classList.toggle('active');
+    });
+
+    // Close mobile menu when clicking on a link
+    navLinks.addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') {
+            navLinks.classList.remove('active');
+            navToggle.classList.remove('active');
+        }
+    });
+
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!navToggle.contains(e.target) && !navLinks.contains(e.target)) {
+            navLinks.classList.remove('active');
+            navToggle.classList.remove('active');
+        }
+    });
+
+    // Add keyboard navigation support
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && navLinks.classList.contains('active')) {
+            navLinks.classList.remove('active');
+            navToggle.classList.remove('active');
+        }
+    });
 }
+
 
 // Render restaurants
 function renderRestaurants(filter = '') {
